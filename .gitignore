@@ -50,3 +50,6 @@ scratch/
 
 *.db
 *.sqlite3
+
+codeshift_key
+codeshift_key.pub

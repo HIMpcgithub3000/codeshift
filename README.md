@@ -1,15 +1,16 @@
 # CodeShift - Multi-Agent Java to Python Project Migration System
 
+[![AWS EC2 Live](https://img.shields.io/badge/AWS%20EC2-3.108.44.80-FF9900?logo=amazon-aws)](http://3.108.44.80)
 [![Google ADK](https://img.shields.io/badge/Agentic%20Engine-Google%20ADK-4285F4)](https://github.com/google/adk)
 [![CrewAI](https://img.shields.io/badge/Auditor-CrewAI-FF5A5F)](https://github.com/crewAIInc/crewAI)
 [![A2A Protocol](https://img.shields.io/badge/Interoperability-A2A%2F1.0-8A2BE2)](src/a2a/a2a_protocol.py)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/Target%20Framework-FastAPI%20%2B%20Jinja2-009688)](https://fastapi.tiangolo.com)
 [![Parity](https://img.shields.io/badge/Behavioral%20Parity-100%25%20Verified-059669)](#-behavioral-parity--frontend-preservation)
 
 **CodeShift** is an enterprise-grade multi-agent AI system that automates the complete migration of entire Java projects (backend business logic, REST APIs, database models, configuration, and frontend HTML templates) into idiomatic, equivalent Python projects (FastAPI, Pydantic, SQLAlchemy, Jinja2), guaranteeing **100% functional and visual UI parity**.
 
-Built exclusively with **Google ADK (`google-adk`)** and **CrewAI (`crewai`)**, CodeShift connects agents using the **A2A/1.0 (Agent-to-Agent)** JSON-RPC 2.0 protocol and integrates external tools via **MCP (Model Context Protocol)**.
+Built exclusively with **Google ADK (`google-adk`)** and **CrewAI (`crewai`)**, CodeShift connects agents using the **A2A/1.0 (Agent-to-Agent)** JSON-RPC 2.0 protocol and integrates external tools via **MCP (Model Context Protocol)**. It is hosted and live in production on AWS EC2 at **[http://3.108.44.80](http://3.108.44.80)**.
 
 ---
 
@@ -210,6 +211,19 @@ Or migrate and automatically launch the Web Dashboard:
 python src/cli.py sample_project --web
 ```
 
+### 4. Extended Capabilities CLI Flags
+CodeShift includes built-in commands for testing, database migration, and reverse engineering:
+```bash
+# Synthesize JUnit 5 / Mockito tests to native pytest & execute live
+python src/cli.py sample_project --test
+
+# Migrate JPA/Hibernate ORM to SQLAlchemy models & generate Alembic migrations
+python src/cli.py sample_project --db-migrate
+
+# Reverse Migration: Convert Python FastAPI project back to Java Spring Boot
+python src/cli.py output --reverse
+```
+
 ---
 
 ## ☕ Tested & Verified Sample Projects
@@ -227,13 +241,25 @@ CodeShift can convert any Java web or standalone project. The dashboard includes
 
 ## ☁️ Deployment
 
-- **Local Docker Compose**:
-  ```bash
-  docker-compose up --build -d
-  ```
-- **Render Cloud 1-Click**:
-  Connect this GitHub repository to Render using the included [render.yaml](render.yaml) blueprint.
-- **Health Verification**:
-  ```bash
-  curl http://localhost:8050/health
-  ```
+### Production AWS EC2 Stack (Live at http://3.108.44.80)
+CodeShift is deployed in production on AWS EC2 using a two-tier containerized architecture:
+1. **Nginx Reverse Proxy** (`codeshift_nginx`): Listens on public HTTP Port `80` with a 600-second timeout for long-running agent workflows.
+2. **Application Runtime** (`codeshift_app`): Python 3.12 Slim container running the FastAPI dashboard on internal port `8080`.
+3. **Persistent Bind Mounts**: Keeps `migrations/`, `output/`, and `logs/` safe across container restarts.
+
+```bash
+# Production launch on AWS EC2:
+docker compose -f docker-compose.prod.yml up -d --build
+
+# Health Verification:
+curl http://3.108.44.80/health
+```
+
+### Local Docker Compose
+```bash
+docker compose up --build -d
+```
+Health Check:
+```bash
+curl http://localhost:8080/health
+```
