@@ -363,6 +363,35 @@ class MigrationOrchestrator:
                 f.write('"""Generated Python package module"""\n')
             print(f"[GenerateWorker] Generated initializer: {rel_path}")
 
+        print("\n==================================================================")
+        print(" [ORCHESTRATOR] 6. AUTOMATED DATABASE & ORM MIGRATION (JPA -> SQLAlchemy & Alembic)")
+        print("==================================================================")
+        from agents.database_migrator import DatabaseMigrationOrchestrator
+        db_orchestrator = DatabaseMigrationOrchestrator(
+            java_repo_dir=self.repo_dir,
+            output_python_dir=self.output_dir,
+            project_name=self.project_name
+        )
+        db_report = db_orchestrator.run_database_migration()
+        print(f"[DatabaseMigrator] Synthesized {db_report.total_tables_generated} SQLAlchemy tables, Alembic initial migration at {db_report.migration_script_path}")
+
+        print("\n==================================================================")
+        print(" [ORCHESTRATOR] 7. AUTOMATED TEST SUITE SYNTHESIS (JUnit 5 / Mockito -> pytest)")
+        print("==================================================================")
+        from agents.test_synthesizer import TestSuiteMigrationOrchestrator
+        java_tests_dir = os.path.join(self.repo_dir, "src", "test", "java")
+        if not os.path.exists(java_tests_dir):
+            java_tests_dir = os.path.join(self.repo_dir, "src", "test")
+        test_out_dir = os.path.join(self.output_dir, "tests")
+
+        test_orchestrator = TestSuiteMigrationOrchestrator(
+            java_test_dir=java_tests_dir,
+            output_tests_dir=test_out_dir,
+            project_name=self.project_name
+        )
+        test_report = test_orchestrator.run_test_synthesis()
+        print(f"[TestSuiteSynthesizer] Synthesized {test_report.total_test_cases} tests across {test_report.test_suites_generated} suites, Pass Rate: {test_report.pass_rate_percentage:.1f}%")
+
         # Compute running time and cost estimates (Req 10)
         wall_clock = self.perf_evaluator.stop_timer()
         perf_cost_report = self.perf_evaluator.calculate_estimates(

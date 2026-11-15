@@ -47,3 +47,6 @@ migrations/
 output/
 *.log
 scratch/
+
+*.db
+*.sqlite3

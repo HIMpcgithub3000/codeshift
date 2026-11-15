@@ -663,6 +663,179 @@ def trigger_migration(repo_path: str = Form("sample_project")):
     return HTMLResponse(content=html_str, media_type="text/html")
 
 
+@app.post("/api/migrate/reverse")
+def trigger_reverse_migration(app_name: str = Form("PetClinicApp")):
+    """
+    Bidirectional Reverse Migration: Converts Python codebase back to Java Spring Boot.
+    Coordinates Google-ADK ReverseTranslatorAgent and CrewAI CodeQualityAuditor via A2A protocol.
+    """
+    from agents.reverse_migrator import ReverseMigrationOrchestrator
+    mig_dir = CURRENT_CONVERSION.get("migrated_dir") or os.path.join(root_dir, "output")
+    conv_dir = CURRENT_CONVERSION.get("conversion_dir")
+    if conv_dir:
+        java_out_dir = os.path.join(conv_dir, "migrated_java")
+    else:
+        java_out_dir = os.path.join(mig_dir, "migrated_java")
+
+    orchestrator = ReverseMigrationOrchestrator(
+        python_dir=mig_dir,
+        output_java_dir=java_out_dir,
+        app_name=app_name
+    )
+    report = orchestrator.run_reverse_migration()
+    CURRENT_CONVERSION["reverse_report"] = report.model_dump()
+    CURRENT_CONVERSION["reverse_dir"] = java_out_dir
+
+    return JSONResponse(content={
+        "status": "success",
+        "total_files": report.total_files_converted,
+        "classes": report.classes_generated,
+        "crewai_audit_score": report.crewai_audit_score,
+        "round_trip_parity_score": report.round_trip_parity_score,
+        "pom_xml": report.pom_xml_generated,
+        "output_directory": java_out_dir,
+        "report": report.model_dump()
+    })
+
+
+@app.get("/api/migrate/reverse/report")
+def get_reverse_migration_report():
+    """Returns the reverse migration report data and generated file contents."""
+    rep = CURRENT_CONVERSION.get("reverse_report")
+    if not rep:
+        mig_dir = CURRENT_CONVERSION.get("migrated_dir") or os.path.join(root_dir, "output")
+        for cand in [os.path.join(mig_dir, "migrated_java", "reverse_migration_report.json"),
+                     os.path.join(root_dir, "output", "migrated_java", "reverse_migration_report.json")]:
+            if os.path.exists(cand):
+                with open(cand, "r", encoding="utf-8") as f:
+                    rep = json.load(f)
+                    break
+
+    if not rep:
+        return JSONResponse(content={"status": "not_run", "message": "No reverse migration report found."})
+
+    return JSONResponse(content=rep)
+
+
+@app.post("/api/migrate/database")
+def trigger_database_migration(project_name: str = Form("PetClinicApp")):
+    """
+    Automated Database & ORM Migration endpoint:
+    Translates JPA/Hibernate models to SQLAlchemy 2.0 and generates Alembic migrations.
+    """
+    from agents.database_migrator import DatabaseMigrationOrchestrator
+    src_dir = CURRENT_CONVERSION.get("source_dir") or os.path.join(root_dir, "sample_project")
+    mig_dir = CURRENT_CONVERSION.get("migrated_dir") or os.path.join(root_dir, "output")
+
+    orchestrator = DatabaseMigrationOrchestrator(
+        java_repo_dir=src_dir,
+        output_python_dir=mig_dir,
+        project_name=project_name
+    )
+    report = orchestrator.run_database_migration()
+    CURRENT_CONVERSION["db_report"] = report.model_dump()
+
+    return JSONResponse(content={
+        "status": "success",
+        "total_tables": report.total_tables_generated,
+        "total_columns": report.total_columns_mapped,
+        "tables": [t.table_name for t in report.tables],
+        "crewai_audit_score": report.crewai_audit_score,
+        "schema_parity_score": report.schema_parity_score,
+        "migration_script": report.migration_script_path,
+        "report": report.model_dump()
+    })
+
+
+@app.get("/api/migrate/database/report")
+def get_database_migration_report():
+    """Returns the database migration report and schema details."""
+    rep = CURRENT_CONVERSION.get("db_report")
+    if not rep:
+        mig_dir = CURRENT_CONVERSION.get("migrated_dir") or os.path.join(root_dir, "output")
+        report_path = os.path.join(mig_dir, "database_migration_report.json")
+        if os.path.exists(report_path):
+            with open(report_path, "r", encoding="utf-8") as f:
+                rep = json.load(f)
+
+    if not rep:
+        return JSONResponse(content={"status": "not_run", "message": "No database migration report found."})
+
+    return JSONResponse(content=rep)
+
+
+@app.post("/api/migrate/tests")
+def trigger_test_synthesis(project_name: str = Form("PetClinicApp")):
+    """
+    Automated Test Suite Synthesis endpoint:
+    Translates JUnit 5 & Mockito test files to native pytest and executes them.
+    """
+    from agents.test_synthesizer import TestSuiteMigrationOrchestrator
+    src_dir = CURRENT_CONVERSION.get("source_dir") or os.path.join(root_dir, "sample_project")
+    mig_dir = CURRENT_CONVERSION.get("migrated_dir") or os.path.join(root_dir, "output")
+    java_test_dir = os.path.join(src_dir, "src", "test", "java")
+    if not os.path.exists(java_test_dir):
+        java_test_dir = os.path.join(src_dir, "src", "test")
+    test_out_dir = os.path.join(mig_dir, "tests")
+
+    orchestrator = TestSuiteMigrationOrchestrator(
+        java_test_dir=java_test_dir,
+        output_tests_dir=test_out_dir,
+        project_name=project_name
+    )
+    report = orchestrator.run_test_synthesis()
+    CURRENT_CONVERSION["test_report"] = report.model_dump()
+
+    return JSONResponse(content={
+        "status": "success",
+        "test_suites": report.test_suites_generated,
+        "total_tests": report.total_test_cases,
+        "passed_tests": report.passed_test_cases,
+        "pass_rate": report.pass_rate_percentage,
+        "assertions": report.assertions_translated,
+        "mocks": report.mocks_translated,
+        "crewai_audit_score": report.crewai_audit_score,
+        "report": report.model_dump()
+    })
+
+
+@app.get("/api/migrate/tests/report")
+def get_test_suite_report():
+    """Returns the test suite synthesis and execution report."""
+    rep = CURRENT_CONVERSION.get("test_report")
+    if not rep:
+        mig_dir = CURRENT_CONVERSION.get("migrated_dir") or os.path.join(root_dir, "output")
+        report_path = os.path.join(mig_dir, "tests", "test_suite_migration_report.json")
+        if os.path.exists(report_path):
+            with open(report_path, "r", encoding="utf-8") as f:
+                rep = json.load(f)
+
+    if not rep:
+        return JSONResponse(content={"status": "not_run", "message": "No test suite synthesis report found."})
+
+    return JSONResponse(content=rep)
+
+
+@app.post("/api/test/run")
+def run_live_tests():
+    """Executes pytest live and returns stdout and pass/fail counters."""
+    mig_dir = CURRENT_CONVERSION.get("migrated_dir") or os.path.join(root_dir, "output")
+    tests_dir = os.path.join(mig_dir, "tests")
+    if not os.path.exists(tests_dir):
+        return JSONResponse(content={"status": "error", "message": "Tests directory not found. Run test synthesis first."})
+
+    py_env = os.environ.copy()
+    py_env["PYTHONPATH"] = f"{mig_dir};{os.path.join(root_dir, 'src')}"
+    res = subprocess.run([sys.executable, "-m", "pytest", tests_dir, "-v"], capture_output=True, text=True, cwd=mig_dir, env=py_env)
+    return JSONResponse(content={
+        "status": "success" if res.returncode == 0 else "failures",
+        "stdout": res.stdout,
+        "stderr": res.stderr,
+        "passed": res.stdout.count("PASSED"),
+        "failed": res.stdout.count("FAILED")
+    })
+
+
 @app.get("/api/view_file")
 def view_file_content(filename: str = Query(...)):
     """API endpoint returning source Java and converted Python source code for in-browser modal inspection."""
@@ -781,6 +954,6 @@ if __name__ == "__main__":
             except OSError:
                 continue
 
-    print(f"\n[CodeShift Dashboard] Starting Dynamic Web Dashboard server on http://0.0.0.0:{selected_port}")
+    print(f"\n[CodeShift Dashboard] Server running at: http://localhost:{selected_port} (or http://127.0.0.1:{selected_port})")
     uvicorn.run(app, host="0.0.0.0", port=selected_port)
 

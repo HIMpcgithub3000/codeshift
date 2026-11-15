@@ -59,13 +59,6 @@ class ObservabilityTracer:
         self.spans: List[TraceSpan] = []
         self._active_spans: Dict[str, float] = {}
 
-    def set_output_dir(self, output_dir: str):
-        """Dynamically update output directory and trace file path."""
-        self.output_dir = os.path.abspath(output_dir)
-        os.makedirs(self.output_dir, exist_ok=True)
-        self.trace_file = os.path.join(self.output_dir, "langfuse_traces.json")
-        self._flush_traces_to_file()
-
         # Initialize Langfuse client if credentials exist in environment
         self.langfuse_client = None
         pub_key = os.getenv("LANGFUSE_PUBLIC_KEY")
@@ -80,6 +73,13 @@ class ObservabilityTracer:
                 print(f"[Observability Warning] Could not connect to Langfuse server: {exc}")
         else:
             print("[Observability] Langfuse tracing active in Local OpenTelemetry Audit Mode (output/langfuse_traces.json).")
+
+    def set_output_dir(self, output_dir: str):
+        """Dynamically update output directory and trace file path."""
+        self.output_dir = os.path.abspath(output_dir)
+        os.makedirs(self.output_dir, exist_ok=True)
+        self.trace_file = os.path.join(self.output_dir, "langfuse_traces.json")
+        self._flush_traces_to_file()
 
     def start_span(
         self,

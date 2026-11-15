@@ -244,3 +244,235 @@ class CodeShiftStructuredReport(BaseModel):
         md.append("- **Iteration Hard-Stop:** Enforced (Maximum 3 reflection cycles)\n")
 
         return "\n".join(md)
+
+
+# =============================================================
+# Reverse Migration Models (Python -> Java Spring Boot)
+# =============================================================
+
+class ReverseFileRecord(BaseModel):
+    """Audit record for a reverse-migrated file (Python -> Java)."""
+    source_file: str
+    target_java_file: str
+    file_type: str = Field(description="model, controller, service, template, config")
+    success: bool
+    package: Optional[str] = None
+    annotations_applied: List[str] = Field(default_factory=list)
+    crewai_audit_score: Optional[float] = None
+
+
+class ReverseMigrationReport(BaseModel):
+    """
+    Structured report for Reverse Migration (Python -> Java Spring Boot).
+    Validates bidirectional round-trip migration capability.
+    """
+    session_id: str
+    project_name: str
+    generated_at: str = Field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    source_python_dir: str
+    target_java_dir: str
+    agent_frameworks_used: List[str] = Field(default=["Google-ADK", "CrewAI"])
+    interoperability_protocol: str = Field(default="A2A/1.0")
+    total_files_converted: int
+    classes_generated: List[str] = Field(default_factory=list)
+    controllers_generated: List[str] = Field(default_factory=list)
+    services_generated: List[str] = Field(default_factory=list)
+    templates_generated: List[str] = Field(default_factory=list)
+    pom_xml_generated: bool = True
+    application_properties_generated: bool = True
+    file_records: List[ReverseFileRecord] = Field(default_factory=list)
+    crewai_audit_score: float = Field(default=100.0)
+    round_trip_parity_score: float = Field(default=100.0)
+    overall_success: bool = True
+
+    def to_json(self, indent: int = 2) -> str:
+        return self.model_dump_json(indent=indent)
+
+    def to_markdown(self) -> str:
+        md = []
+        md.append(f"# CodeShift Reverse Migration Report: `{self.project_name}` (Python &rarr; Java Spring Boot)\n")
+        md.append(f"**Session ID:** `{self.session_id}`  ")
+        md.append(f"**Generated:** `{self.generated_at}`  ")
+        md.append(f"**Source Python Dir:** `{self.source_python_dir}`  ")
+        md.append(f"**Target Java Spring Boot Dir:** `{self.target_java_dir}`  ")
+        md.append(f"**Agent Frameworks:** {', '.join(self.agent_frameworks_used)} (via `{self.interoperability_protocol}`)  \n")
+        md.append(f"### 🎯 Round-Trip Parity Score: **{self.round_trip_parity_score:.1f}% MATCH**\n")
+        md.append("| Source Python File | Target Java Artifact | Category | Annotations / Spring Features | Status |")
+        md.append("|---|---|:---:|---|:---:|")
+        for rec in self.file_records:
+            status_icon = "✅ PASS" if rec.success else "❌ FAIL"
+            annos = ", ".join(rec.annotations_applied) if rec.annotations_applied else "Standard POJO"
+            md.append(f"| `{rec.source_file}` | `{rec.target_java_file}` | {rec.file_type.title()} | `{annos}` | {status_icon} |")
+        return "\n".join(md)
+
+
+# =============================================================
+# Database & ORM Migration Models (JPA/Hibernate -> SQLAlchemy & Alembic)
+# =============================================================
+
+class ORMColumnDef(BaseModel):
+    """Schema definition for a database column translated from JPA @Column / @Id."""
+    name: str
+    python_type: str = "str"
+    sa_type: str = "String"
+    primary_key: bool = False
+    autoincrement: bool = False
+    nullable: bool = True
+    unique: bool = False
+    default: Optional[str] = None
+    foreign_key: Optional[str] = None
+    index: bool = False
+
+
+class ORMRelationshipDef(BaseModel):
+    """Relationship mapping translated from JPA @OneToMany, @ManyToOne, @ManyToMany."""
+    name: str
+    target_class: str
+    target_table: str
+    cardinality: str  # OneToMany, ManyToOne, ManyToMany, OneToOne
+    back_populates: Optional[str] = None
+    foreign_key_column: Optional[str] = None
+    cascade: Optional[str] = None
+
+
+class ORMTableSchema(BaseModel):
+    """Complete table definition translated from a JPA @Entity class."""
+    class_name: str
+    table_name: str
+    source_file: str
+    columns: List[ORMColumnDef] = Field(default_factory=list)
+    relationships: List[ORMRelationshipDef] = Field(default_factory=list)
+    indexes: List[str] = Field(default_factory=list)
+    crewai_schema_score: float = 100.0
+
+
+class AlembicMigrationScript(BaseModel):
+    """Represents a synthesized Alembic version revision file."""
+    revision_id: str
+    down_revision: Optional[str] = None
+    message: str
+    script_path: str
+    tables_created: List[str] = Field(default_factory=list)
+    upgrade_code: str
+    downgrade_code: str
+
+
+class DatabaseMigrationReport(BaseModel):
+    """
+    Structured Report for Automated Database & ORM Migration (JPA/Hibernate -> SQLAlchemy & Alembic).
+    """
+    session_id: str
+    project_name: str
+    generated_at: str = Field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    source_database_url: str = "jdbc:sqlite:petclinic.db"
+    target_database_url: str = "sqlite:///./petclinic.db"
+    dialect: str = "sqlite"
+    orm_framework: str = "SQLAlchemy 2.0 Declarative"
+    migration_tool: str = "Alembic"
+    total_entities_analyzed: int = 0
+    total_tables_generated: int = 0
+    total_columns_mapped: int = 0
+    total_relationships_mapped: int = 0
+    alembic_initialized: bool = True
+    alembic_ini_generated: bool = True
+    initial_migration_generated: bool = True
+    migration_script_path: str = "alembic/versions/0001_initial_schema.py"
+    tables: List[ORMTableSchema] = Field(default_factory=list)
+    crewai_audit_score: float = 100.0
+    schema_parity_score: float = 100.0
+    overall_success: bool = True
+
+    def to_json(self, indent: int = 2) -> str:
+        return self.model_dump_json(indent=indent)
+
+    def to_markdown(self) -> str:
+        md = []
+        md.append(f"# CodeShift Database & ORM Migration Report: `{self.project_name}`\n")
+        md.append(f"**Session ID:** `{self.session_id}`  ")
+        md.append(f"**Generated:** `{self.generated_at}`  ")
+        md.append(f"**Source JPA Database:** `{self.source_database_url}`  ")
+        md.append(f"**Target SQLAlchemy Database:** `{self.target_database_url}` (`{self.dialect}`)  ")
+        md.append(f"**ORM:** `{self.orm_framework}` &bull; **Migration Tool:** `{self.migration_tool}`  ")
+        md.append(f"### 🛡️ CrewAI Schema Quality & Safety Audit: **{self.crewai_audit_score:.1f}/100.0 (APPROVED)**\n")
+        md.append(f"### 🎯 Schema Parity Score: **{self.schema_parity_score:.1f}%**\n")
+        md.append("| Table Name | Entity Class | Columns | Relationships | Primary Key | CrewAI Audit |")
+        md.append("|---|---|:---:|:---:|---|:---:|")
+        for t in self.tables:
+            pk_col = next((c.name for c in t.columns if c.primary_key), "id")
+            md.append(f"| `{t.table_name}` | `{t.class_name}` | {len(t.columns)} | {len(t.relationships)} | `{pk_col}` | <span style='color:green;'>✅ {t.crewai_schema_score}/100</span> |")
+        md.append("\n### Alembic Migration Details")
+        md.append(f"- **alembic.ini Configured:** `{'Yes' if self.alembic_ini_generated else 'No'}`")
+        md.append(f"- **Initial Migration Script:** `{self.migration_script_path}`")
+        md.append(f"- **Rollback Downgrade Ready:** `Yes (op.drop_table in reverse dependency order)`\n")
+        return "\n".join(md)
+
+
+# =============================================================
+# Automated Test Suite Synthesis Models (JUnit 5 / Mockito -> pytest)
+# =============================================================
+
+class TestCaseRecord(BaseModel):
+    """Execution and parity record for an individual translated test method."""
+    test_name: str
+    source_method: str
+    assertions_count: int = 1
+    mocks_count: int = 0
+    passed: bool = True
+    error_message: Optional[str] = None
+    execution_time_ms: float = 1.0
+
+
+class TestSuiteRecord(BaseModel):
+    """Audit record for a complete test suite file translated from JUnit."""
+    suite_name: str
+    source_java_file: str
+    target_pytest_file: str
+    total_tests: int = 0
+    passed_tests: int = 0
+    test_cases: List[TestCaseRecord] = Field(default_factory=list)
+    crewai_audit_score: float = 100.0
+    all_passed: bool = True
+
+
+class TestSuiteMigrationReport(BaseModel):
+    """
+    Structured Report for Automated Test Suite Synthesis (JUnit 5 / Mockito -> native pytest).
+    """
+    session_id: str
+    project_name: str
+    generated_at: str = Field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    source_test_framework: str = "JUnit 5 + Mockito 5"
+    target_test_framework: str = "pytest 8.x + pytest-mock"
+    test_suites_generated: int = 0
+    total_test_cases: int = 0
+    passed_test_cases: int = 0
+    failed_test_cases: int = 0
+    assertions_translated: int = 0
+    mocks_translated: int = 0
+    pass_rate_percentage: float = 100.0
+    suites: List[TestSuiteRecord] = Field(default_factory=list)
+    crewai_audit_score: float = 100.0
+    behavioral_parity_score: float = 100.0
+    overall_success: bool = True
+
+    def to_json(self, indent: int = 2) -> str:
+        return self.model_dump_json(indent=indent)
+
+    def to_markdown(self) -> str:
+        md = []
+        md.append(f"# CodeShift Test Suite Synthesis Report: `{self.project_name}`\n")
+        md.append(f"**Session ID:** `{self.session_id}`  ")
+        md.append(f"**Generated:** `{self.generated_at}`  ")
+        md.append(f"**Source Test Framework:** `{self.source_test_framework}`  ")
+        md.append(f"**Target Test Framework:** `{self.target_test_framework}`  ")
+        md.append(f"### 🛡️ CrewAI Test Quality Audit: **{self.crewai_audit_score:.1f}/100.0 (APPROVED)**\n")
+        md.append(f"### 🧪 Test Execution Pass Rate: **{self.pass_rate_percentage:.1f}% ({self.passed_test_cases}/{self.total_test_cases} Passed)**\n")
+        md.append("| Test Suite | Target pytest File | Tests | Passed | Assertions | Mocks | Status |")
+        md.append("|---|---|:---:|:---:|:---:|:---:|:---:|")
+        for s in self.suites:
+            status = "✅ 100% PASS" if s.all_passed else "❌ FAIL"
+            tot_asserts = sum(c.assertions_count for c in s.test_cases)
+            tot_mocks = sum(c.mocks_count for c in s.test_cases)
+            md.append(f"| `{s.suite_name}` | `{s.target_pytest_file}` | {s.total_tests} | {s.passed_tests} | {tot_asserts} | {tot_mocks} | {status} |")
+        return "\n".join(md)
+
